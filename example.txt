@@ -1,0 +1,129 @@
+The filter() method is an intermediate operation of the Stream interface that allows us to filter elements of a stream that match a given Predicate:
+
+Stream<T> filter(Predicate<? super T> predicate)
+
+To see how this works, let’s create a Customer class:
+
+public class Customer {
+    private String name;
+    private int points;
+    //Constructor and standard getters
+}
+
+In addition, let’s create a collection of customers:
+
+Customer john = new Customer("John P.", 15);
+Customer sarah = new Customer("Sarah M.", 200);
+Customer charles = new Customer("Charles B.", 150);
+Customer mary = new Customer("Mary T.", 1);
+
+List<Customer> customers = Arrays.asList(john, sarah, charles, mary);
+
+2.1. Filtering Collections
+
+A common use case of the filter() method is processing collections.
+
+Let’s make a list of customers with more than 100 points. To do that, we can use a lambda expression:
+
+List<Customer> customersWithMoreThan100Points = customers
+  .stream()
+  .filter(c -> c.getPoints() > 100)
+  .collect(Collectors.toList());
+
+We can also use a method reference, which is shorthand for a lambda expression:
+
+List<Customer> customersWithMoreThan100Points = customers
+  .stream()
+  .filter(Customer::hasOverHundredPoints)
+  .collect(Collectors.toList());
+
+In this case, we added the hasOverHundredPoints method to our Customer class:
+
+public boolean hasOverHundredPoints() {
+    return this.points > 100;
+}
+
+In both cases, we get the same result:
+
+assertThat(customersWithMoreThan100Points).hasSize(2);
+assertThat(customersWithMoreThan100Points).contains(sarah, charles);
+
+2.2. Filtering Collections with Multiple Criteria
+
+Furthermore, we can use multiple conditions with filter(). For example, we can filter by points and name:
+
+List<Customer> charlesWithMoreThan100Points = customers
+  .stream()
+  .filter(c -> c.getPoints() > 100 && c.getName().startsWith("Charles"))
+  .collect(Collectors.toList());
+
+assertThat(charlesWithMoreThan100Points).hasSize(1);
+assertThat(charlesWithMoreThan100Points).contains(charles);
+
+3. Handling Exceptions
+
+Until now, we’ve been using the filter with predicates that don’t throw an exception. Indeed, the functional interfaces in Java don’t declare any checked or unchecked exceptions.
+
+Next we’re going to show some different ways to handle exceptions in lambda expressions.
+3.1. Using a Custom Wrapper
+
+First, we’ll start by adding a profilePhotoUrl to our Customer:
+
+private String profilePhotoUrl;
+
+In addition, let’s add a simple hasValidProfilePhoto() method to check the availability of the profile:
+
+public boolean hasValidProfilePhoto() throws IOException {
+    URL url = new URL(this.profilePhotoUrl);
+    HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+    return connection.getResponseCode() == HttpURLConnection.HTTP_OK;
+}
+
+We can see that the hasValidProfilePhoto() method throws an IOException. Now if we try to filter the customers with this method:
+
+List<Customer> customersWithValidProfilePhoto = customers
+  .stream()
+  .filter(Customer::hasValidProfilePhoto)
+  .collect(Collectors.toList());
+
+We’ll see the following error:
+
+Incompatible thrown types java.io.IOException in functional expression
+
+To handle it, one of the alternatives we can use is wrapping it with a try-catch block:
+
+List<Customer> customersWithValidProfilePhoto = customers
+  .stream()
+  .filter(c -> {
+      try {
+          return c.hasValidProfilePhoto();
+      } catch (IOException e) {
+          //handle exception
+      }
+      return false;
+  })
+  .collect(Collectors.toList());
+
+If we need to throw an exception from our predicate, we can wrap it in an unchecked exception like RuntimeException.
+3.2. Using ThrowingFunction
+
+Alternatively, we can use the ThrowingFunction library.
+
+ThrowingFunction is an open source library that allows us to handle checked exceptions in Java functional interfaces.
+
+Let’s start by adding the throwing-function dependency to our pom:
+
+<dependency>	
+    <groupId>com.pivovarit</groupId>	
+    <artifactId>throwing-function</artifactId>	
+    <version>1.5.1</version>	
+</dependency>
+
+To handle exceptions in predicates, this library offers us the ThrowingPredicate class, which has the unchecked() method to wrap checked exceptions.
+
+Let’s see it in action:
+
+List customersWithValidProfilePhoto = customers
+  .stream()
+  .filter(ThrowingPredicate.unchecked(Customer::hasValidProfilePhoto))
+  .collect(Collectors.toList());
